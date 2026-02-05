@@ -48,6 +48,50 @@ async function run() {
       res.send(stallion);
     });
 
+    app.delete("/stallions/:id", verifyJWT, async (req, res) => {
+      try {
+        const stallionId = new ObjectId(req.params.id);
+
+        const stallion = await stallionCollection.findOne({ _id: stallionId });
+        if (!stallion) return res.status(404).send({ message: "Not found" });
+
+        // 🔐 নিশ্চিত করবো stallion টা তার নিজের
+        if (stallion.owner.userId.toString() !== req.user.userId) {
+          return res.status(403).send({ message: "Not allowed" });
+        }
+
+        // 🐎 Delete stallion
+        await stallionCollection.deleteOne({ _id: stallionId });
+
+        // 👤 User doc update
+        await userCollection.updateOne(
+          { _id: new ObjectId(req.user.userId) },
+          { $pull: { registeredStallions: stallionId } },
+        );
+
+        res.send({ message: "Stallion deleted" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Delete failed" });
+      }
+    });
+
+    app.get("/my-stallions", verifyJWT, async (req, res) => {
+  try {
+    const userId = new ObjectId(req.user.userId);
+
+    const stallions = await stallionCollection
+      .find({ "owner.userId": userId })
+      .toArray();
+
+    res.send(stallions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ message: "Failed to fetch stallions" });
+  }
+});
+
+
     app.post("/admin/login", async (req, res) => {
       const { email, password } = req.body;
 
