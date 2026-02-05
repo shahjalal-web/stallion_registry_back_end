@@ -77,20 +77,19 @@ async function run() {
     });
 
     app.get("/my-stallions", verifyJWT, async (req, res) => {
-  try {
-    const userId = new ObjectId(req.user.userId);
+      try {
+        const userId = new ObjectId(req.user.userId);
 
-    const stallions = await stallionCollection
-      .find({ "owner.userId": userId })
-      .toArray();
+        const stallions = await stallionCollection
+          .find({ "owner.userId": userId })
+          .toArray();
 
-    res.send(stallions);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({ message: "Failed to fetch stallions" });
-  }
-});
-
+        res.send(stallions);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Failed to fetch stallions" });
+      }
+    });
 
     app.post("/admin/login", async (req, res) => {
       const { email, password } = req.body;
@@ -201,7 +200,6 @@ async function run() {
     app.post("/stallions", verifyJWT, async (req, res) => {
       try {
         const stallionData = req.body;
-        console.log("hello");
         // 🔎 Logged in user find
         const user = await userCollection.findOne({
           _id: new ObjectId(req.user.userId),
@@ -211,6 +209,7 @@ async function run() {
 
         const newStallion = {
           ...stallionData,
+          approved: false,
           owner: {
             userId: user._id,
             name: user.name,
