@@ -114,28 +114,35 @@ async function run() {
 
     app.post("/signup", async (req, res) => {
       try {
-        const { name, email, password, ...rest } = req.body;
-        // 1️⃣ Email already আছে কিনা check
+        const { name, email, password, firebaseUid, ...rest } = req.body;
+        console.log(req.body);
+        // 1️⃣ Check if user already in MongoDB
         const existingUser = await userCollection.findOne({ email });
         if (existingUser) {
-          return res.status(400).send({ message: "Email already exists" });
+          // Jodi user Firebase-e thake kintu DB-te na ashe, setao handle kora uchit
+          return res
+            .status(400)
+            .send({ message: "Email already exists in Database" });
         }
 
         // 2️⃣ Password hash
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // 3️⃣ User object তৈরি (role force করে দিচ্ছি)
+        // 3️⃣ User object (Firebase UID soho)
         const newUser = {
           name,
           email,
           password: hashedPassword,
-          role: "user", // 🔥 default role
+          firebaseUid: firebaseUid || null, // Firebase ID save kora hochche
+          role: "user",
           createdAt: new Date(),
           ...rest,
         };
 
-        // 4️⃣ DB তে save
+        // 4️⃣ DB-te save
         const result = await userCollection.insertOne(newUser);
+
+        // JWT Token Generate
         const token = jwt.sign(
           { userId: result.insertedId, email, role: "user" },
           process.env.JWT_SECRET,
@@ -147,13 +154,32 @@ async function run() {
           { projection: { password: 0 } },
         );
 
-        res.send({
+        res.status(201).send({
           message: "Signup successful",
           user: savedUser,
           token,
         });
       } catch (error) {
-        res.status(500).send({ message: "Server error" });
+        console.error("MongoDB Error:", error);
+        res
+          .status(500)
+          .send({ message: "Server error during MongoDB insertion" });
+      }
+    });
+
+    app.patch("/sync-password", async (req, res) => {
+      try {
+        const { email, newPassword } = req.body;
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        await userCollection.updateOne(
+          { email },
+          { $set: { password: hashedPassword } },
+        );
+
+        res.send({ message: "Database password updated successfully" });
+      } catch (error) {
+        res.status(500).send({ message: "Sync failed" });
       }
     });
 
@@ -169,7 +195,10 @@ async function run() {
         // 🔐 Compare hashed password
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-          return res.status(400).send({ message: "Invalid email or password" });
+          return res.status(401).json({
+            code: "PASSWORD_MISMATCH",
+            message: "Password incorrect",
+          });
         }
 
         // 🎟️ Create JWT
