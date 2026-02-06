@@ -17,8 +17,7 @@ app.get("/", async (req, res) => {
   res.send("stallion server is running on port 5000");
 });
 
-const uri =
-  "mongodb+srv://stallionRegistry:stallionRegistry@cluster0.xnyro57.mongodb.net/?appName=Cluster0";
+const uri = process.env.DATABASE_URL;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -265,7 +264,9 @@ async function run() {
 
     app.get("/stallions", async (req, res) => {
       try {
-        const stallions = await stallionCollection.find({}).toArray();
+        const stallions = await stallionCollection
+          .find({ approved: true })
+          .toArray();
 
         res.send(stallions);
       } catch (err) {
